@@ -1,9 +1,7 @@
 name: Node CI
 
 on:
-  push:
-    branches-ignore:
-      - master
+  workflow_dispatch:
 
 jobs:
   release:

@@ -159,16 +159,12 @@ export const update = async (shouldCommit = false) => {
           const url = replaceEnvironmentVariables(site.url);
           let address = url;
           if (isIP(url)) {
-            if (site.ipv6 && !isIPv6(url))
-              throw new Error("Site URL must be IPv6 for ipv6 check");
+            if (site.ipv6 && !isIPv6(url)) throw new Error("Site URL must be IPv6 for ipv6 check");
           } else {
-            if (site.ipv6)
-              address = (await dns.promises.resolve6(url))[0];
-            else
-              address = (await dns.promises.resolve4(url))[0];
+            if (site.ipv6) address = (await dns.promises.resolve6(url))[0];
+            else address = (await dns.promises.resolve4(url))[0];
 
-            if (!isIP(address))
-              throw new Error("Site IP address could not be resolved");
+            if (!isIP(address)) throw new Error("Site IP address could not be resolved");
           }
 
           const tcpResult = await ping({
@@ -248,26 +244,8 @@ export const update = async (shouldCommit = false) => {
         const responseTime = (result.totalTime * 1000).toFixed(0);
         const expectedStatusCodes = (
           site.expectedStatusCodes || [
-            200,
-            201,
-            202,
-            203,
-            200,
-            204,
-            205,
-            206,
-            207,
-            208,
-            226,
-            300,
-            301,
-            302,
-            303,
-            304,
-            305,
-            306,
-            307,
-            308,
+            200, 201, 202, 203, 200, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305,
+            306, 307, 308,
           ]
         ).map(Number);
         let status: "up" | "down" | "degraded" = expectedStatusCodes.includes(
@@ -277,8 +255,15 @@ export const update = async (shouldCommit = false) => {
           : "down";
         if (parseInt(responseTime) > (site.maxResponseTime || 60000)) status = "degraded";
         if (status === "up" && typeof result.data === "string") {
-          if (site.__dangerous__body_down && result.data.includes(replaceEnvironmentVariables(site.__dangerous__body_down)))
-            status = "down";
+          if (site.__dangerous__body_down) {
+            const pattern = replaceEnvironmentVariables(site.__dangerous__body_down);
+            try {
+              if (new RegExp(pattern).test(result.data)) status = "down";
+            } catch (error) {
+              console.log("regex failed, falling back to plain text matching");
+              if (result.data.includes(pattern)) status = "down";
+            }
+          }
           if (
             site.__dangerous__body_degraded &&
             result.data.includes(replaceEnvironmentVariables(site.__dangerous__body_degraded))
@@ -287,12 +272,16 @@ export const update = async (shouldCommit = false) => {
         }
         if (
           site.__dangerous__body_degraded_if_text_missing &&
-          !result.data.includes(replaceEnvironmentVariables(site.__dangerous__body_degraded_if_text_missing))
+          !result.data.includes(
+            replaceEnvironmentVariables(site.__dangerous__body_degraded_if_text_missing)
+          )
         )
           status = "degraded";
         if (
           site.__dangerous__body_down_if_text_missing &&
-          !result.data.includes(replaceEnvironmentVariables(site.__dangerous__body_down_if_text_missing))
+          !result.data.includes(
+            replaceEnvironmentVariables(site.__dangerous__body_down_if_text_missing)
+          )
         )
           status = "down";
         return { result, responseTime, status };
@@ -304,23 +293,23 @@ export const update = async (shouldCommit = false) => {
      * If the site is down, we perform the test 2 more times to make
      * sure that it's not a false alarm
      */
-    if (status === "down" || status === "degraded") {
-      wait(1000);
-      const secondTry = await performTestOnce();
-      if (secondTry.status === "up") {
-        result = secondTry.result;
-        responseTime = secondTry.responseTime;
-        status = secondTry.status;
-      } else {
-        wait(10000);
-        const thirdTry = await performTestOnce();
-        if (thirdTry.status === "up") {
-          result = thirdTry.result;
-          responseTime = thirdTry.responseTime;
-          status = thirdTry.status;
-        }
-      }
-    }
+    // if (status === "down" || status === "degraded") {
+    //   wait(1000);
+    //   const secondTry = await performTestOnce();
+    //   if (secondTry.status === "up") {
+    //     result = secondTry.result;
+    //     responseTime = secondTry.responseTime;
+    //     status = secondTry.status;
+    //   } else {
+    //     wait(10000);
+    //     const thirdTry = await performTestOnce();
+    //     if (thirdTry.status === "up") {
+    //       result = thirdTry.result;
+    //       responseTime = thirdTry.responseTime;
+    //       status = thirdTry.status;
+    //     }
+    //   }
+    // }
 
     try {
       if (shouldCommit || currentStatus !== status) {

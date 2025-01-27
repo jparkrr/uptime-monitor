@@ -237,26 +237,8 @@ const update = async (shouldCommit = false) => {
                 console.log("Result from test", result.httpCode, result.totalTime);
                 const responseTime = (result.totalTime * 1000).toFixed(0);
                 const expectedStatusCodes = (site.expectedStatusCodes || [
-                    200,
-                    201,
-                    202,
-                    203,
-                    200,
-                    204,
-                    205,
-                    206,
-                    207,
-                    208,
-                    226,
-                    300,
-                    301,
-                    302,
-                    303,
-                    304,
-                    305,
-                    306,
-                    307,
-                    308,
+                    200, 201, 202, 203, 200, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305,
+                    306, 307, 308,
                 ]).map(Number);
                 let status = expectedStatusCodes.includes(Number(result.httpCode))
                     ? "up"
@@ -264,8 +246,18 @@ const update = async (shouldCommit = false) => {
                 if (parseInt(responseTime) > (site.maxResponseTime || 60000))
                     status = "degraded";
                 if (status === "up" && typeof result.data === "string") {
-                    if (site.__dangerous__body_down && result.data.includes((0, environment_1.replaceEnvironmentVariables)(site.__dangerous__body_down)))
-                        status = "down";
+                    if (site.__dangerous__body_down) {
+                        const pattern = (0, environment_1.replaceEnvironmentVariables)(site.__dangerous__body_down);
+                        try {
+                            if (new RegExp(pattern).test(result.data))
+                                status = "down";
+                        }
+                        catch (error) {
+                            console.log("regex failed, falling back to plain text matching");
+                            if (result.data.includes(pattern))
+                                status = "down";
+                        }
+                    }
                     if (site.__dangerous__body_degraded &&
                         result.data.includes((0, environment_1.replaceEnvironmentVariables)(site.__dangerous__body_degraded)))
                         status = "degraded";
@@ -284,24 +276,23 @@ const update = async (shouldCommit = false) => {
          * If the site is down, we perform the test 2 more times to make
          * sure that it's not a false alarm
          */
-        if (status === "down" || status === "degraded") {
-            wait(1000);
-            const secondTry = await performTestOnce();
-            if (secondTry.status === "up") {
-                result = secondTry.result;
-                responseTime = secondTry.responseTime;
-                status = secondTry.status;
-            }
-            else {
-                wait(10000);
-                const thirdTry = await performTestOnce();
-                if (thirdTry.status === "up") {
-                    result = thirdTry.result;
-                    responseTime = thirdTry.responseTime;
-                    status = thirdTry.status;
-                }
-            }
-        }
+        // if (status === "down" || status === "degraded") {
+        //   wait(1000);
+        //   const secondTry = await performTestOnce();
+        //   if (secondTry.status === "up") {
+        //     result = secondTry.result;
+        //     responseTime = secondTry.responseTime;
+        //     status = secondTry.status;
+        //   } else {
+        //     wait(10000);
+        //     const thirdTry = await performTestOnce();
+        //     if (thirdTry.status === "up") {
+        //       result = thirdTry.result;
+        //       responseTime = thirdTry.responseTime;
+        //       status = thirdTry.status;
+        //     }
+        //   }
+        // }
         try {
             if (shouldCommit || currentStatus !== status) {
                 await (0, fs_extra_1.writeFile)((0, path_1.join)(".", "history", `${slug}.yml`), `url: ${site.url}
