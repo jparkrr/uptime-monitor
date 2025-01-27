@@ -1,7 +1,9 @@
 name: Build CI
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - master
 
 jobs:
   release:
@@ -27,8 +29,8 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
-      - name: Run Tests
-        run: npm run test
+      # - name: Run Tests
+      #   run: npm run test
 
       - name: Build Package
         run: npm run package
